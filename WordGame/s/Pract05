@@ -1,0 +1,403 @@
+.data
+
+.include "ConstPalabras6Car.S" 						@incluimos las constantes correspondientes
+PALABRA:                .asciz "------" 				@introducimos la palabra que debe adivinar el usuario
+
+@definimos las distintas respuestas que va a decir nuestro programa virtual
+BIENVENIDA:             .asciz "Hola humano, bienvenido a los juegos del hambre, me llamo J.A.R.V.I.S., ahora que el señor Stark esta ocupado... Juguemos a algo"
+EXPLICACION:            .asciz "Te explico como va el juego: Introduces una letra y mi amigo Bob te dice si la palabra misteriosa la tiene o no, di algo a nuestro inutil nuevo Bob"
+TRESPUNTOS:             .asciz "Bob: ..."
+INSULTOBOB:             .asciz "tras Sokovia nunca volvió a ser el mismo... , comecemos!!!"
+
+INTRODUCE_LETRA: 	.asciz "Bob: Introduzca una letra"
+LETRA_BIEN:             .asciz "Bob: La letra introducida es correcta"
+LETRA_MAL:              .asciz "Bob: La letra introducida es incorrecta"
+QUEDAN_INTENTOS:        .asciz "Bob: Los intentos que te quedan son: "
+FIN_PROGRAMA_BIEN:      .asciz "Bob: Enhorabuena!! Has ganado!"
+MAL_FIN:                .asciz "Bob: Te has quedado sin intentos, has perdido"
+SUPALABRA:              .asciz "Bob: Su palabra ahora es: "
+
+STRINGBORRAR:           .asciz "Palabra a adivinar: "
+LETRA_INTRODUCIDA:      .asciz "Bob: Su letra introducida es: "
+
+
+FALLO1:                 .asciz "Pensé que serías como Batman pero te has quedado al nivel del Robin... "
+FALLO2:                 .asciz "Es un juego de mierda... ¿Como fallas tanto?"
+FALLO3:                 .asciz "After all this time... sigues siendo igual de inutil al ahorcado"
+
+ACIERTO1:               .asciz "Aunque hayas acertado una... Nunca podrás derrotarme MUAJAJAJAJAJ, cof cof... ¿Alguien tiene un caramelito de menta? ¿Bob?"
+ACIERTO2:                .asciz "No te hagas ilusiones... todos tenemos suerte, como Harry Potter en absolutamente toda su vida, mira que es inutil..."
+ACIERTO3:                .asciz "Esto es como cuando Bowser secuestra a la princesa Peach. Mario nunca la alcanzará porque Peach es una inutil que no hace nada para defenderse, ASI QUE NO TE VENGAS ARRIBA, siempre hay más castillos a los que desplazarse..."
+ACIERTO4:               .asciz "Intentas ganarme pero... Yo soy tu padre!! ¿No? ¿No cuela? Vaya... Con Luke funcionó a la perfección y todos sabemos como acabó..."
+ACIERTO5:               .asciz "Nunca pensé que llegarias tan lejos... Eso me dijo mi madre =( "
+
+GANA:                   .asciz "Vaya... nunca pensé que esto seria como la típica peli Disney donde todo acaba bien sin ningún motivo aparente y consiguiendo un principe azul que aparece de repente sin ningún tipo de contexto anterior... sigo esperando a la princesa para Elsa... A LA PROXIMA ME VENGARÉ, I'LL BE BACK"
+PIERDE:                 .asciz "MUAJAJAAJAJAAJJA, TE LO DIJE, EL TEAM IRONMAN SIEMPRE GANA, vete a llorar a tu casa..."
+AMPLIARVENTANA:         .asciz "¿Has ampliado la ventana? S/N"
+@definimos el vector donde vamos a guardar en que posición se repite de la palabra elegida la letra introducida por el usuario
+                        .equ LV, 6
+                        .equ LE, 4
+                        .align 2
+repeticionLetra:        .space LV*LE
+
+.global _start
+.text
+_start:
+
+@le preguntamos al usuario si ha ampliado la ventana
+LDR R0, =AMPLIARVENTANA
+SWI 0X02
+SWI 0X04
+MOV  R0, #0XA
+SWI 0X0
+
+MOV R4, #4 				@num de intentos
+MOV R5, #0				@ i del for
+LDR R9, =PALABRA		@cargamos la palabra definida en memoria
+
+BL principioProgramaHabla	@llamada a la subrutina
+
+MOV R0, #NUM_PALABRAS			@movemos al R0 el parámetro de la función random, que es 900
+BL RANDOM			@llamamos a RANDOM
+MOV R10, R0			@movemos lo que nos devuelve la subrutina
+BL EligePalabra	@llamamos a la función para que nos devuelva la palabra a adivinar
+
+MOV  R6, R0				@la preservamos en un registro
+MOV R0, #0XA
+SWI 0X0
+
+MOV R11, #0			@num de veces que acertamos una palabra
+
+
+FOR: CMP R5, #6			@ for (i < 6)
+     BEQ FINFOR			@si i = 6 vete al final del codigo
+     MOV R0, R9			@movemos la palabra a mostrar
+     BL MostrarPalabra		@como parámetro de la funcion
+     LDR R0, =INTRODUCE_LETRA @cargamos el String definido en memoria
+     SWI 0X02	@ponemos el SWI para que lo enseñe por pantalla
+
+     SWI 0X04				@pedimos la letra por pamtalla
+     MOV R7, R0			@la preservamos en un registro
+
+LDR R0, =LETRA_INTRODUCIDA	@le mostramos al usuario la letra que ha introducido
+     SWI 0x02
+     MOV R0, R7
+     SWI 0x00
+     MOV R0, #0XA				@introducimos un carácter en blanco
+     SWI 0X0
+
+MOV R0, R7	@cargamos en los registros correspondientes los parámetros de la función letra correcta
+     MOV R1, R6
+     BL letra_correcta		@llamamos a la funcion
+     MOV R8, R0			@preservamos su resultado
+
+
+     IF1: CMP R8, #1				@ if (letraCorrecta >=1)
+          BLT IF2
+          LDR R0, =LETRA_BIEN	@imprimimos que ha introducido bien la letra
+          SWI 0X02
+          MOV R0, #0XA			@carácter en blanco
+          SWI 0X0
+
+IFletraigual:	@if (letraCorrecta >=2) significa que se ha repetido mas de una vez la letra por lo que
+          CMP R8, #2
+          BLT IFcontinua
+          MOV R12, R8
+          SUB R12, R12, #1			@restamos uno a la letraCorrecta
+          ADD R5, R5, R12			@sumamos I + lo anterior
+
+          IFcontinua:				@si solo se ha repetido una vez
+          MOV R0, R9				@movemos los parámetros de la funcion
+          MOV R1, R7
+          MOV R2, R8
+          BL destapa_letra			@llamamos a la función
+          ADD R11, R11, #1	@sumamos 1 al numero de veces que hemos acertado una letra
+          MOV R0, R11
+          BL programaHablandoAciertos	@llamamos a la funcion
+          B FINIF
+IF2: 				@si letraCorrecta = 0
+
+LDR R0, =LETRA_MAL		@cargamos el string
+          SWI 0X02
+          MOV R0, #0XA
+          SWI 0X0
+          SUB R4, R4, #1			@restamos uno a los intentos
+          MOV R12, R4
+          ADD R12, R12, #0x30	@para imprimirlo como asciz y no como int necesitamos sumarle 0x30
+LDR R0, =QUEDAN_INTENTOS	@imprimimos por pantalla lo correspondiente
+          SWI 0X02
+          MOV R0, R12
+          SWI 0X00
+          MOV R0, #0XA
+          SWI 0X0
+          MOV R0, R4				@metemos los parámetros
+          BL programaHablandoFallos	@llamamos a la función
+     IF3: CMP R4, #0				@si los fallos son 0
+          BNE FOR
+          LDR R0, =STRINGBORRAR	@imprimimos la palabra que tendría que haber adivinado
+          SWI 0X02
+          MOV R0, R6
+          SWI 0x02
+          MOV R0, #0XA
+          SWI 0X0
+          BL finalizar_programa_mal		@llamamos a la función
+     FINIF: ADD R5, R5, #1			@sumamos uno a la i
+            B FOR
+     FINFOR: MOV R0, R9			@ponemos los parámetros de la función
+             BL MostrarPalabra			@llamamos a la función
+             LDR R0, =FIN_PROGRAMA_BIEN @imprimimos el string
+             SWI 0X02
+             MOV R0, #0XA
+             SWI 0X0
+             LDR R0, =GANA			@imprimimos el siguiente string
+             SWI 0X02
+             SWI 0X11				@acabamos el programa
+
+letra_correcta:
+
+STMDB SP!, {R4-R10, LR}	@movemos la pila los registros que necesitamos
+
+      MOV R4, #0				@ I = 0
+      MOV R5, #0				@ j = 0
+      MOV R6, R0				@ letra introducida
+      MOV R7, R1				@palabra
+      MOV R10, #0	@ numero de veces que se repite la letra
+
+
+      LDR R9, =repeticionLetra		@vector
+
+      WHILE: LDRB R8, [R7]		@cargamos el byte [i] de palabra
+             CMP R5, #6				@while palabra[i] != 0
+             BEQ FinWHILE
+             CMP R8, R6				@palabra[i] = letra
+             BNE FinIF4
+             STR R4, [R9]			@lo guardamos en el V[j] en memoria
+             ADD R9, R9, #LE	@sumamos al vector para que vaya a su próxima dirección
+ADD R10, R10, #1	@sumamos 1 al numero de veces que se repite la letra
+
+             FinIF4: ADD R4, R4, #1		@ i++
+                     ADD R7, R7, #1		@ vamos a la siguiente letra de palabra
+                     ADD R5, R5, #1		@ j++
+                     B WHILE
+      FinWHILE:
+      MOV R0, R10	@return numero de veces que se repite la letra
+
+      LDMIA SP!, {R4-R10, LR}		@devolvemos la pila a su sitio
+      MOV PC, LR	@ acabamos la subrutina moviendo el LR al PC
+
+
+destapa_letra:
+
+STMDB SP!, {R4-R10, LR}	@movemos la pila los registros que necesitamos
+
+     MOV R4, R0				@palabra
+     MOV R9, R2				@contador
+     MOV R6, R1				@letra
+     LDR R7, =repeticionLetra		@V
+
+     MOV R10, #0				@ i = 0
+
+     while2: LDR R8,[R7]			@ v [i]
+             CMP R9, R10			@ while Contador < i
+             BEQ FINwhile2
+             STRB R6, [R4, R8]	@sustituimos en la posición de palabra[v[i]] la letra
+ADD R7, R7, #LE	@sumamos al vector para ir a su siguiente posición
+             ADD R10, R10, #1			@ i++
+             B while2
+
+     FINwhile2:
+
+     LDMIA SP!, {R4-R10, LR}		@devolvemos la pila a su sitio
+     MOV PC, LR				@movemos el LR al PC
+
+finalizar_programa_mal:
+
+    LDR R0, =MAL_FIN			@cargamos los string correspondientes
+    SWI 0X02
+    MOV R0, #0XA
+    SWI 0X0
+    LDR R0, =PIERDE
+    SWI 0X02
+    SWI 0X11					@terminamos el programa
+
+
+EligePalabra:
+
+      STMDB SP!, {R4-R8, LR}		@movemos la pila
+
+MOV R4, R0 	@Movemos el número de la palabra que queremos
+      LDR R5, =PALABRAS			@cargamos el struct de palabras
+      MOV R7, #OFF_PALABRA		@ lo que ocupa cada palabra
+
+MUL R6, R4, R7	@multiplicamos lo que ocupa cada palabra por el numero de palabra al cual queremos ir
+      ADD R6,R6,R5				@nos desplazamos a esa direccion
+
+      MOV R0, R6				@la devolvemos
+      LDMIA SP!, {R4-R8, LR}		@volvemos a mover la pila
+
+      MOV PC, LR				@Movemos el LR al PC
+
+MostrarPalabra:
+
+      STMDB SP!, {R4-R5, LR}		@movemos la pila
+
+      MOV R4, R0				@palabra con g
+
+      LDR R5, =SUPALABRA		@cargamos el string correspondiente
+      MOV R0, R5
+      SWI 0X02
+      MOV R0, #0XA
+      SWI 0X0
+
+MOV R0, R4	@mostramos la palabra que tiene ahora el usuario
+      SWI 0X02
+      MOV R0, #0XA
+      SWI 0X0
+
+      LDMIA SP!, {R4-R5, LR}	@devolvemos la pila a su sitio
+      MOV PC, LR			@Movemos el LR al PC
+
+programaHablandoFallos:
+
+      MOV R3, R0			@numero de intentos que le quedan
+
+PRINCIPIO:
+      cmp R3, #1			@ if = 3
+      beq fallo1				@ salta a esta instrucción
+      cmp r3, #2			@ if = 2
+      beq fallo2				@ salta a esta instrucción
+      cmp r3, #3			@ if = 3
+      beq fallo3				@ salta a esta instrucción
+      cmp r3, #0			@ if = 0
+      beq fin				@ salta a esta instrucción
+
+      fallo1:
+
+      mov r0, #0XA
+      SWI 0X0
+      ldr r0, =FALLO1		@imprimimos el string correspondiente
+      SWI 0X02
+      MOV R0, #0XA
+      SWI 0X0
+      b fin
+
+      fallo2:
+      MOV R0, #0XA
+      SWI 0X0
+      ldr r0, =FALLO2		@imprimimos el string correspondiente
+      SWI 0X02
+      MOV R0, #0XA
+      SWI 0X0
+      b fin
+
+      fallo3:
+      MOV R0, #0XA
+      SWI 0X0
+      ldr r0, =FALLO3		@imprimimos el string correspondiente
+      SWI 0X02
+      MOV R0, #0XA
+      SWI 0X0
+      b fin
+
+      fin:
+
+      MOV PC, LR			@movemos el LR al PC
+
+
+programaHablandoAciertos:
+
+       MOV R3, R0			@número de veces que ha acertado una letra
+
+       CMP R3, #1			@ if = 1
+       beq acierto1			@ salta a esta instrucción
+
+       CMP R3, #2			@ if = 2
+       beq acierto2			@ salta a esta instrucción
+
+       CMP R3, #3			@ if = 3
+       beq acierto3			@ salta a esta instrucción
+
+       CMP R3, #4			@ if = 4
+       beq acierto4			@ salta a esta instrucción
+
+       CMP R3, #5			@ if = 5
+       beq acierto5			@ @ salta a esta instrucción
+
+       acierto1:
+       MOV R0, #0XA
+       SWI 0X0
+       LDR r0, =ACIERTO1		@imprimimos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+       B FIN2
+
+       acierto2:
+       MOV R0, #0XA
+       SWI 0X0
+       LDR r0, =ACIERTO2		@imprimimos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+       B FIN2
+
+       acierto3:
+       MOV R0, #0XA
+       SWI 0X0
+       LDR r0, =ACIERTO3		@imprimimos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+       B FIN2
+
+       acierto4:
+       MOV R0, #0XA
+       SWI 0X0
+       LDR r0, =ACIERTO4		@imprimimos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+       B FIN2
+
+       acierto5:
+       MOV R0, #0XA
+       SWI 0X0
+       LDR r0, =ACIERTO1		@imprimimos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+       B FIN2
+
+FIN2:
+
+      MOV PC, LR			@ movemos el LR al PC
+
+principioProgramaHabla:
+
+       LDR R0, =BIENVENIDA	@ movemos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+
+       MOV R0, #0XA
+       SWI 0X0
+       LDR R0, =EXPLICACION	@ movemos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+
+       MOV R0, #0XA
+       SWI 0X0
+       LDR R0, =TRESPUNTOS	@ movemos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+
+       MOV R0, #0XA
+       SWI 0X0
+       LDR R0, =INSULTOBOB	@ movemos el string correspondiente
+       SWI 0x02
+       MOV R0, #0XA
+       SWI 0X0
+
+       MOV PC, LR			@ acabamos la subrutina moviendo el LR al PC
